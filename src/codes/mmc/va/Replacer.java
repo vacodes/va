@@ -5,17 +5,21 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.PrintWriter;
+import java.nio.file.CopyOption;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 public class Replacer {
 	
 	
 	private static final Map<String, String> to_replace = new HashMap<>();
 	private static final List<String>        rows       = new ArrayList<String>();
-
 	
 	private static void loadConfig(File configFile) throws Exception {
 		FileReader reader = new FileReader(configFile);
@@ -32,7 +36,7 @@ public class Replacer {
 				if (lineIndex == 1) { 
 					replaceChar = line; 
 				}
-				lineIndex ++;
+				lineIndex++;
 				
 			} else {
 				String newValue = line.split(replaceChar)[1];
@@ -43,58 +47,45 @@ public class Replacer {
 		br.close();
 	}
 	
-	private static void readFile(File file) throws Exception {
-		FileReader reader = new FileReader(file);
-		BufferedReader br = new BufferedReader(reader);
+	private static void replaceValues(final File file) throws Exception {
+		final BufferedReader reader = new BufferedReader(new FileReader(file));
 		
-		String line = null;
+		final File tempOutFile = File.createTempFile("tmp-replacer", "txt");
+		final PrintWriter writer = new PrintWriter(tempOutFile);
 		
-		boolean first = true;
-		while ((line = br.readLine()) != null) {
-			if (!first) {
-				rows.add(line);
+		boolean firstLine = true;
+		
+		String text = null;
+		while((text = reader.readLine()) != null) {
+			if(firstLine) { 
+				firstLine = false; 
+				continue;
 			}
-			first = false;
-		}
-		br.close();
-	}
-	
-	public static void saveFile(File fileName) throws Exception {
-		PrintWriter pw = new PrintWriter(fileName);
-		for (String s : rows) {
-			pw.write(s + "\r\n");
-		}
-		pw.close();
-	}
-	
-	private static void replaceValues() {
-		for (int i = 0; i < rows.size(); i++) {
-			String text = rows.get(i);
 			
-			for (String key : to_replace.keySet()) {
-				text = text.replace(key, to_replace.get(key));
+			for (final Entry<String, String> entry : to_replace.entrySet()) {
+				text = text.replace(entry.getKey(), entry.getValue());
 			}
-			rows.set(i, text);
+			
+			writer.println(text);
 		}
+		
+		reader.close();
+		writer.close();
+		
+		Files.move(tempOutFile.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
 	}
 	
-	
-	public static void main(String[] args) {
+	public static void main(final String[] args) {
 		final boolean showStacktrace = true;
 		final File file = new File("demo.txt");
 		final File conf = new File("replace.txt");
 		
 		try {
 			loadConfig(conf);
-			
-			readFile(file);
-        	replaceValues();
-        	saveFile(file);
-	        	
+        	replaceValues(file);
 		} catch (Exception e) {
-			
-			if (showStacktrace) { e.printStackTrace();
-			
+			if (showStacktrace) { 
+				e.printStackTrace();
 			} else {
 				System.err.println("Error occurred. Activate Stacktrace for more information");
 			}
